@@ -5,7 +5,7 @@ to output log data as JSON formatted strings
 import logging
 import json
 import re
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
 import traceback
 import importlib
 
@@ -88,9 +88,6 @@ class JsonFormatter(logging.Formatter):
             that will be used to customize the indent of the output json.
         :param prefix: an optional string prefix added at the beginning of
             the formatted string
-        :param rename_fields: an optional dict, used to rename field names in the output.
-            Rename message to @message: {'message': '@message'}
-        :param static_fields: an optional dict, used to add fields with static values to all logs
         :param json_indent: indent parameter for json.dumps
         :param json_ensure_ascii: ensure_ascii parameter for json.dumps
         :param reserved_attrs: an optional list of fields that will be skipped when
@@ -107,8 +104,6 @@ class JsonFormatter(logging.Formatter):
         self.json_indent = kwargs.pop("json_indent", None)
         self.json_ensure_ascii = kwargs.pop("json_ensure_ascii", True)
         self.prefix = kwargs.pop("prefix", "")
-        self.rename_fields = kwargs.pop("rename_fields", {})
-        self.static_fields = kwargs.pop("static_fields", {})
         reserved_attrs = kwargs.pop("reserved_attrs", RESERVED_ATTRS)
         self.reserved_attrs = dict(zip(reserved_attrs, reserved_attrs))
         self.timestamp = kwargs.pop("timestamp", False)
@@ -153,17 +148,13 @@ class JsonFormatter(logging.Formatter):
         Override this method to implement custom logic for adding fields.
         """
         for field in self._required_fields:
-            if field in self.rename_fields:
-                log_record[self.rename_fields[field]] = record.__dict__.get(field)
-            else:
-                log_record[field] = record.__dict__.get(field)
-        log_record.update(self.static_fields)
+            log_record[field] = record.__dict__.get(field)
         log_record.update(message_dict)
         merge_record_extra(record, log_record, reserved=self._skip_fields)
 
         if self.timestamp:
             key = self.timestamp if type(self.timestamp) == str else 'timestamp'
-            log_record[key] = datetime.fromtimestamp(record.created, tz=timezone.utc)
+            log_record[key] = datetime.utcnow()
 
     def process_log_record(self, log_record):
         """
@@ -179,10 +170,6 @@ class JsonFormatter(logging.Formatter):
                                     cls=self.json_encoder,
                                     indent=self.json_indent,
                                     ensure_ascii=self.json_ensure_ascii)
-
-    def serialize_log_record(self, log_record):
-        """Returns the final representation of the log record."""
-        return "%s%s" % (self.prefix, self.jsonify_log_record(log_record))
 
     def format(self, record):
         """Formats a log record and serializes to json"""
@@ -219,4 +206,4 @@ class JsonFormatter(logging.Formatter):
         self.add_fields(log_record, record, message_dict)
         log_record = self.process_log_record(log_record)
 
-        return self.serialize_log_record(log_record)
+        return "%s%s" % (self.prefix, self.jsonify_log_record(log_record))

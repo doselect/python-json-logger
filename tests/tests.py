@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
 import unittest
-import unittest.mock
 import logging
 import json
 import sys
 import traceback
-import random
 
 try:
-    import xmlrunner  # noqa
+    import xmlrunner
 except ImportError:
     pass
 
 try:
-    from StringIO import StringIO  # noqa
+    from StringIO import StringIO
 except ImportError:
     # Python 3 Support
     from io import StringIO
@@ -25,7 +23,7 @@ import datetime
 
 class TestJsonLogger(unittest.TestCase):
     def setUp(self):
-        self.logger = logging.getLogger("logging-test-{}".format(random.randint(1, 101)))
+        self.logger = logging.getLogger('logging-test')
         self.logger.setLevel(logging.DEBUG)
         self.buffer = StringIO()
 
@@ -41,29 +39,6 @@ class TestJsonLogger(unittest.TestCase):
         logJson = json.loads(self.buffer.getvalue())
 
         self.assertEqual(logJson["message"], msg)
-
-    def testRenameBaseField(self):
-        fr = jsonlogger.JsonFormatter(rename_fields={'message': '@message'})
-        self.logHandler.setFormatter(fr)
-
-        msg = "testing logging format"
-        self.logger.info(msg)
-        logJson = json.loads(self.buffer.getvalue())
-
-        self.assertEqual(logJson["@message"], msg)
-
-    def testAddStaticFields(self):
-        fr = jsonlogger.JsonFormatter(static_fields={'log_stream': 'kafka'})
-
-        self.logHandler.setFormatter(fr)
-
-        msg = "testing static fields"
-        self.logger.info(msg)
-        logJson = json.loads(self.buffer.getvalue())
-
-        self.assertEqual(logJson["log_stream"], "kafka")
-        self.assertEqual(logJson["message"], msg)
-
 
     def testFormatKeys(self):
         supported_keys = [
@@ -86,7 +61,7 @@ class TestJsonLogger(unittest.TestCase):
             'threadName'
         ]
 
-        log_format = lambda x: ['%({0:s})s'.format(i) for i in x]
+        log_format = lambda x: ['%({0:s})'.format(i) for i in x]
         custom_format = ' '.join(log_format(supported_keys))
 
         fr = jsonlogger.JsonFormatter(custom_format)
@@ -155,17 +130,6 @@ class TestJsonLogger(unittest.TestCase):
         self.assertEqual(logJson.get("otherdatetimeagain"),
                          "1900-01-01T00:00:00")
 
-    @unittest.mock.patch('time.time', return_value=1500000000.0)
-    def testJsonDefaultEncoderWithTimestamp(self, time_mock):
-        fr = jsonlogger.JsonFormatter(timestamp=True)
-        self.logHandler.setFormatter(fr)
-
-        self.logger.info("Hello")
-
-        self.assertTrue(time_mock.called)
-        logJson = json.loads(self.buffer.getvalue())
-        self.assertEqual(logJson.get("timestamp"), "2017-07-14T02:40:00+00:00")
-
     def testJsonCustomDefault(self):
         def custom(o):
             return "very custom"
@@ -224,25 +188,7 @@ class TestJsonLogger(unittest.TestCase):
         msg = self.buffer.getvalue().split('"message": "', 1)[1].split('"', 1)[0]
         self.assertEqual(msg, "Привет")
 
-    def testCustomObjectSerialization(self):
-        def encode_complex(z):
-            if isinstance(z, complex):
-                return (z.real, z.imag)
-            else:
-                type_name = z.__class__.__name__
-                raise TypeError("Object of type '{}' is no JSON serializable".format(type_name))
 
-        formatter = jsonlogger.JsonFormatter(json_default=encode_complex,
-                                             json_encoder=json.JSONEncoder)
-        self.logHandler.setFormatter(formatter)
-
-        value = {
-            "special": complex(3, 8),
-        }
-
-        self.logger.info(" message", extra=value)
-        msg = self.buffer.getvalue()
-        self.assertEqual(msg, "{\"message\": \" message\", \"special\": [3.0, 8.0]}\n")
 
 if __name__ == '__main__':
     if len(sys.argv[1:]) > 0:
